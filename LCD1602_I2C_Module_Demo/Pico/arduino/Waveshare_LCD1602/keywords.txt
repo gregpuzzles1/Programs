@@ -1,0 +1,41 @@
+#######################################
+# Syntax Coloring Map For Grove
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+Waveshare_LCD1602	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+init 	KEYWORD2
+display	KEYWORD2
+command	KEYWORD2
+lcd_send    KEYWORD2
+setCursor	KEYWORD2
+clear	KEYWORD2
+data	KEYWORD2
+send_string KEYWORD2
+noCursor    KEYWORD2
+cursor	KEYWORD2
+scrollDisplayLeft	KEYWORD2
+scrollDisplayRight	KEYWORD2
+leftToRight	KEYWORD2
+rightToLeft	KEYWORD2
+noAutoscroll	KEYWORD2
+autoscroll	KEYWORD2
+createChar  KEYWORD2
+
+led_send	    KEYWORD2
+set_brightness	KEYWORD2
+set_led_mode	KEYWORD2
+#######################################
+# Constants (LITERAL1)
+#######################################
+LCD_ADDRESS	LITERAL1
+
+SN3193_IIC_ADDRESS LITERAL1
+LED_NORNAL_MODE LITERAL1
+LED_BREATH_MODE LITERAL1
