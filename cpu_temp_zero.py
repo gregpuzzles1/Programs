@@ -36,4 +36,4 @@ def get_cpu_temp():
 while True:
     print("CPU Temp:", get_cpu_temp(), "°C")
     time.sleep(5)  # Check every 5 seconds
->>>>>>> 32a62d55644d1b527434522ef547e7d0cc55a316
+>>>>>>>
