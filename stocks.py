@@ -2,23 +2,21 @@
 import sys
 import os
 import json
-import yfinance as yf
 import requests
+import datetime
 import matplotlib.pyplot as plt
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLineEdit, QLabel, QDoubleSpinBox,
-    QMessageBox, QTextBrowser
+    QMessageBox, QTextBrowser, QSplitter
 )
-from PyQt5.QtGui import QColor, QFont
+from PyQt5.QtGui import QColor, QFont, QPixmap
 from PyQt5.QtCore import Qt
-
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-NEWS_API_KEY = "e457d8a70f914ae89d95ce286075c72b"  # Replace with your actual NewsAPI.org key
-
+FINNHUB_API_KEY = "d0suae9r01qid5qbgqjgd0suae9r01qid5qbgqk0"
 
 class StockDashboard(QWidget):
     def __init__(self):
@@ -28,6 +26,10 @@ class StockDashboard(QWidget):
 
         self.holdings = []
         self.editing_index = None
+        self.logo_label = QLabel()
+        self.website_label = QLabel()
+        self.website_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.website_label.setOpenExternalLinks(True)
 
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -36,7 +38,7 @@ class StockDashboard(QWidget):
         self.create_table()
         self.create_button_row()
         self.create_news_section()
-        self.create_pie_chart()
+        self.create_chart_and_logo_section()
         self.create_summary_box()
 
         self.load_holdings()
@@ -70,13 +72,14 @@ class StockDashboard(QWidget):
         self.table.setColumnCount(12)
         self.table.setHorizontalHeaderLabels([
             "Symbol", "Shares", "Cost Basis", "Price",
-            "Open", "High", "Low", "52W High", "52W Low", "Value", "P/L", "Industry"
+            "Open", "High", "Low", "Prev Close", "Value", "P/L", "Exchange", "Industry"
         ])
         self.table.setStyleSheet("QTableWidget { font-family: monospace; font-size: 12pt; }")
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.itemSelectionChanged.connect(self.show_news_for_selected)
+        self.table.itemSelectionChanged.connect(self.show_logo_for_selected)
         self.layout.addWidget(self.table)
 
     def create_button_row(self):
@@ -108,45 +111,31 @@ class StockDashboard(QWidget):
         self.layout.addWidget(QLabel("Latest News:"))
         self.layout.addWidget(self.news_box)
 
-    def fetch_news(self, symbol):
-        try:
-            url = f"https://newsapi.org/v2/everything?q={symbol}&sortBy=publishedAt&language=en&apiKey={NEWS_API_KEY}"
-            response = requests.get(url)
-            data = response.json()
+    def create_chart_and_logo_section(self):
+        splitter = QSplitter(Qt.Horizontal)
 
-            if data.get("status") != "ok":
-                return [f"<b>Error:</b> {data.get('message', 'Unable to fetch news')}"]
+        self.logo_label.setFixedSize(200, 200)
+        self.logo_label.setAlignment(Qt.AlignCenter)
+        self.logo_label.setText("Company Logo")
 
-            articles = data.get("articles", [])
-            headlines = []
-            for article in articles[:5]:
-                title = article.get("title", "No Title")
-                link = article.get("url", "")
-                if title and link:
-                    headlines.append(f"<a href=\"{link}\">{title}</a>")
+        logo_widget = QWidget()
+        logo_layout = QVBoxLayout()
+        logo_layout.addWidget(self.logo_label)
+        logo_layout.addWidget(self.website_label)
+        logo_widget.setLayout(logo_layout)
 
-            return headlines or ["No news articles found."]
-        except Exception as e:
-            return [f"<b>Error fetching news:</b> {e}"]
-
-    def show_news_for_selected(self):
-        selected_items = self.table.selectedItems()
-        if not selected_items:
-            self.news_box.setText("")
-            return
-
-        row = selected_items[0].row()
-        if row < 0 or row >= len(self.holdings):
-            return
-
-        symbol = self.holdings[row]["symbol"]
-        headlines = self.fetch_news(symbol)
-        self.news_box.setText(f"<b>News for {symbol}:</b><br><br>" + "<br><br>".join(headlines))
-
-    def create_pie_chart(self):
         self.figure_pie = Figure(figsize=(6, 4))
         self.canvas_pie = FigureCanvas(self.figure_pie)
-        self.layout.addWidget(self.canvas_pie)
+
+        pie_widget = QWidget()
+        pie_layout = QVBoxLayout()
+        pie_layout.addWidget(self.canvas_pie)
+        pie_widget.setLayout(pie_layout)
+
+        splitter.addWidget(logo_widget)
+        splitter.addWidget(pie_widget)
+        splitter.setSizes([300, 800])
+        self.layout.addWidget(splitter)
 
     def update_pie_chart(self, values):
         self.figure_pie.clear()
@@ -159,6 +148,39 @@ class StockDashboard(QWidget):
         else:
             ax.text(0.5, 0.5, 'No Data', ha='center')
         self.canvas_pie.draw()
+
+    def show_logo_for_selected(self):
+        selected_items = self.table.selectedItems()
+        if not selected_items:
+            self.logo_label.clear()
+            self.logo_label.setText("Company Logo")
+            self.website_label.clear()
+            return
+        row = selected_items[0].row()
+        if row < 0 or row >= len(self.holdings):
+            return
+
+        symbol = self.holdings[row]['symbol']
+        profile = self.get_profile(symbol)
+        logo_url = profile.get("logo")
+        website_url = profile.get("weburl")
+
+        if logo_url:
+            try:
+                response = requests.get(logo_url)
+                pixmap = QPixmap()
+                pixmap.loadFromData(response.content)
+                self.logo_label.setPixmap(pixmap.scaled(self.logo_label.size(), Qt.KeepAspectRatio))
+            except Exception as e:
+                print(f"Error loading logo: {e}")
+                self.logo_label.setText("No Logo Available")
+        else:
+            self.logo_label.setText("No Logo Available")
+
+        if website_url:
+            self.website_label.setText(f"<a href=\"{website_url}\">Visit Company Website</a>")
+        else:
+            self.website_label.setText("Website not available")
 
     def create_summary_box(self):
         self.summary_label = QLabel("Total Value: $0.00 | Total P/L: $0.00")
@@ -177,6 +199,50 @@ class StockDashboard(QWidget):
             f'<span style="color: black;">| Total P/L:</span> '
             f'<span style="color: {color};">${total_pl:+,.2f}</span>'
         )
+
+    def fetch_news(self, symbol):
+        try:
+            today = datetime.date.today()
+            from_date = today - datetime.timedelta(days=7)
+            url = f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={from_date}&to={today}&token={FINNHUB_API_KEY}"
+            response = requests.get(url)
+            data = response.json()
+
+            headlines = []
+            for article in data[:5]:
+                title = article.get("headline", "No Title")
+                link = article.get("url", "")
+                if title and link:
+                    headlines.append(f"<a href=\"{link}\">{title}</a>")
+
+            return headlines or ["No news articles found."]
+        except Exception as e:
+            print(f"Error fetching news for {symbol}: {e}")
+            return [f"<b>Error fetching news:</b> {e}"]
+
+    def show_news_for_selected(self):
+        selected_items = self.table.selectedItems()
+        if not selected_items:
+            self.news_box.setText("")
+            return
+
+        row = selected_items[0].row()
+        if row < 0 or row >= len(self.holdings):
+            return
+
+        symbol = self.holdings[row]["symbol"]
+        headlines = self.fetch_news(symbol)
+        self.news_box.setText(f"<b>News for {symbol}:</b><br><br>" + "<br><br>".join(headlines))
+
+    def get_quote(self, symbol):
+        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        return response.json()
+
+    def get_profile(self, symbol):
+        url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={FINNHUB_API_KEY}"
+        response = requests.get(url)
+        return response.json()
 
     def add_or_update_stock(self):
         symbol = self.symbol_input.text().strip().upper()
@@ -211,19 +277,23 @@ class StockDashboard(QWidget):
             QMessageBox.warning(self, "No Selection", "Please select a stock to edit.")
 
     def delete_selected_row(self):
-        selected = self.table.currentRow()
-        if selected >= 0 and selected < len(self.holdings):
+        selected_items = self.table.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "No Selection", "Please select a stock to delete.")
+            return
+
+        row = selected_items[0].row()
+        if 0 <= row < len(self.holdings):
+            symbol = self.holdings[row]['symbol']
             reply = QMessageBox.question(
                 self, 'Confirm Deletion',
-                f"Are you sure you want to delete {self.holdings[selected]['symbol']}?",
+                f"Are you sure you want to delete {symbol}?",
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No
             )
             if reply == QMessageBox.Yes:
-                del self.holdings[selected]
+                del self.holdings[row]
                 self.update_table()
                 self.save_holdings()
-        else:
-            QMessageBox.warning(self, "No Selection", "Please select a stock to delete.")
 
     def clear_all_stocks(self):
         if not self.holdings:
@@ -241,6 +311,7 @@ class StockDashboard(QWidget):
             self.save_holdings()
 
     def update_table(self):
+        self.table.setRowCount(0)
         self.table.setRowCount(len(self.holdings))
         for i, stock in enumerate(self.holdings):
             self.table.setItem(i, 0, QTableWidgetItem(stock["symbol"]))
@@ -262,21 +333,16 @@ class StockDashboard(QWidget):
         for i, stock in enumerate(self.holdings):
             symbol = stock["symbol"]
             try:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="1d")
-                info = ticker.info
+                quote = self.get_quote(symbol)
+                profile = self.get_profile(symbol)
 
-                if data.empty:
-                    raise ValueError("No data returned")
-
-                row = data.iloc[-1]
-                price = row["Close"]
-                open_price = row["Open"]
-                high_price = row["High"]
-                low_price = row["Low"]
-                high_52 = info.get("fiftyTwoWeekHigh", 0)
-                low_52 = info.get("fiftyTwoWeekLow", 0)
-                industry = info.get("industry", "N/A")
+                price = quote['c']
+                open_price = quote['o']
+                high_price = quote['h']
+                low_price = quote['l']
+                prev_close = quote['pc']
+                exchange = profile.get('exchange', 'N/A')
+                industry = profile.get('finnhubIndustry', 'N/A')
 
                 value = price * stock["shares"]
                 pl = (price - stock["cost"]) * stock["shares"]
@@ -284,28 +350,20 @@ class StockDashboard(QWidget):
                 total_value += value
                 total_pl += pl
 
-                values = [price, open_price, high_price, low_price, high_52, low_52, value]
+                values = [price, open_price, high_price, low_price, prev_close, value, pl, exchange, industry]
                 for j, val in enumerate(values):
-                    item = QTableWidgetItem(f"${val:,.2f}")
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    if j in [7, 8]:
+                        item = QTableWidgetItem(val)
+                    else:
+                        item = QTableWidgetItem(f"${val:,.2f}" if isinstance(val, (int, float)) else str(val))
+                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        if j == 6:
+                            item.setForeground(QColor("green" if val > 0 else "red" if val < 0 else "gray"))
                     self.table.setItem(i, j + 3, item)
 
-                pl_item = QTableWidgetItem(f"${pl:+,.2f}")
-                pl_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                if pl > 0:
-                    pl_item.setForeground(QColor("green"))
-                elif pl < 0:
-                    pl_item.setForeground(QColor("red"))
-                else:
-                    pl_item.setForeground(QColor("gray"))
-                self.table.setItem(i, 10, pl_item)
-
-                industry_item = QTableWidgetItem(industry)
-                industry_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self.table.setItem(i, 11, industry_item)
-
                 pie_data.append({"symbol": symbol, "value": value})
-            except Exception:
+            except Exception as e:
+                print(f"Error fetching data for {symbol}: {e}")
                 for col in range(3, 12):
                     item = QTableWidgetItem("Error")
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -329,7 +387,6 @@ class StockDashboard(QWidget):
             with open("holdings.json", "r") as f:
                 self.holdings = json.load(f)
                 self.update_table()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
