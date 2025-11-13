@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Scrolls Zig Ziglar quote with hearts, scrolls twice, ends with blessing
+# Birthday greeting for Leon with scrolling hearts and blessing
 
 import sys
-sys.path.append('./lcdlib')  # Adjust if your path is different
+sys.path.append('./lcdlib')  # Adjust if your driver path is different
 
 import LCD1602
 import time
@@ -11,7 +11,7 @@ import time
 lcd = LCD1602.LCD1602(16, 2)
 led = LCD1602.SN3193()
 
-# Heart shape (CGRAM slot 0)
+# Custom heart character (CGRAM slot 0)
 heart_char = [
     0b00000,
     0b01010,
@@ -23,30 +23,28 @@ heart_char = [
     0b00000
 ]
 
-# Zig Ziglar quote to scroll
-quote = (
-    "Success means doing the best we can with what we have. "
-    "Success is the doing, not the getting.   "
-)
-
-# Heart animation pattern
-hearts = chr(0) * 3 + "   "
+# Scroll message and heart pattern
+message = "HAPPY BIRTHDAY, Susan!!   "
+hearts = chr(0) * 3 + "   "  # Three hearts and space
 
 try:
     lcd.clear()
     led.set_brightness(90)
+
+    # Load heart shape into CGRAM slot 0
     lcd.createChar(0, heart_char)
 
-    scroll_len = max(len(quote), len(hearts)) - 15
-    scroll_count = 2  # ✅ scroll only twice now
+    scroll_len = max(len(message), len(hearts)) - 15
+    scroll_count = 3
 
+    # Scroll the message and hearts 3 times
     for _ in range(scroll_count):
         for i in range(scroll_len):
-            # Scroll line 1: quote
+            # Line 1: Scrolling birthday message
             lcd.setCursor(0, 0)
-            lcd.printout(quote[i:i+16].ljust(16))
+            lcd.printout(message[i:i+16].ljust(16))
 
-            # Scroll line 2: hearts
+            # Line 2: Scrolling hearts
             h = hearts[i % len(hearts):] + hearts[:i % len(hearts)]
             h = (h + " " * 16)[:16]
             lcd.setCursor(0, 1)
