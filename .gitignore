@@ -92,6 +92,7 @@ $RECYCLE.BIN/
 
 # Linux
 *~
+core.*
 
 # Raspberry Pi artifacts (SD card or OS backup, firmware, overlays)
 *.img
